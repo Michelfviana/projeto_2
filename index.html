@@ -1,29 +1,149 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <title>AR - A-Frame + MindAR Demo</title>
+  <!-- A-Frame and MindAR (image tracking) -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    /* Simple centered overlay loader while assets initialize */
+    .mindar-ui-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 10;
+      flex-direction: column;
+      color: #fff;
+      font-family: sans-serif;
+    }
+
+    .loader {
+      border: 8px solid #222;
+      border-top: 8px solid #fff;
+      border-radius: 50%;
+      width: 72px;
+      height: 72px;
+      animation: spin 1.2s linear infinite;
+      margin-bottom: 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .note {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(0,0,0,0.4);
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      z-index: 11;
+    }
+  </style>
 </head>
 
 <body>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="mindar-ui-overlay">
+    <div class="loader"></div>
+    <div>Carregando cena AR…</div>
+  </div>
+
+  <!-- Small on-screen note for demo instructions -->
+  <div class="note">Aponte a câmera para o marcador. Clique no modelo para alternar rotação.</div>
+
+  <!-- MindAR A-Frame scene. Uses the provided `marcador.mind` dataset in the repo. -->
   <a-scene mindar-image="imageTargetSrc: ./marcador.mind; autoStart: true;" vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false" color-space="sRGB"
     renderer="colorManagement: true, physicallyCorrectLights">
+
+    <!-- Preload model (local file `modelo.glb` present in the repo). If you want to use a remote model,
+         replace the src below or add another <a-asset-item>. -->
+    <a-assets>
+      <a-asset-item id="modelo" src="./modelo.glb"></a-asset-item>
+    </a-assets>
+
     <a-camera position="0 0 0" look-controls="enabled: false" cursor="fuse: false; rayOrigin: mouse;"
       raycaster="far: 10000; objects: .clickable"></a-camera>
 
+    <!-- Target index 0 corresponds to the first marker in `marcador.mind` -->
     <a-entity mindar-image-target="targetIndex: 0">
 
-      <a-gltf-model src="./modelo.glb" position="0 0 0" scale="0.5 0.5 0.5" rotation="0 0 0" class="clickable">
-        <a-animation attribute="rotation" to="0 360 0" dur="10000" easing="linear" repeat="indefinite">
-        </a-animation>
+      <!-- 3D model: uses preloaded asset. `class=clickable` so the raycaster/cursor can target it. -->
+      <a-entity id="modelEntity" class="clickable" gltf-model="#modelo" position="0 0 0"
+        scale="0.4 0.4 0.4" rotation="0 0 0"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear; autoplay: true">
+      </a-entity>
 
-      </a-gltf-model>
+      <!-- A subtle ground plane to help orient the model -->
+      <a-ring position="0 -0.01 0" rotation="-90 0 0" radius-inner="0.02" radius-outer="0.25" color="#222" opacity="0.6">
+      </a-ring>
+
     </a-entity>
 
   </a-scene>
+
+  <script>
+    (function () {
+      const scene = document.querySelector('a-scene');
+      const loading = document.getElementById('loading');
+      const model = document.getElementById('modelEntity');
+
+      // Hide loader when the renderer is ready
+      scene.addEventListener('renderstart', () => {
+        loading.style.display = 'none';
+      });
+
+      // Toggle rotation animation on click/tap
+      let rotating = true;
+      model.addEventListener('click', (ev) => {
+        rotating = !rotating;
+        if (rotating) {
+          model.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear; autoplay: true');
+        } else {
+          model.removeAttribute('animation');
+        }
+        // small scale 'bounce' to give feedback
+        model.setAttribute('animation__scale', 'property: scale; to: 0.5 0.5 0.5; dur: 200; dir: alternate; loop: 1');
+      });
+
+      // Optional: log when marker is found/lost
+      const target = document.querySelector('[mindar-image-target]');
+      target.addEventListener('targetFound', (e) => {
+        console.log('Marcador detectado:', e);
+      });
+      target.addEventListener('targetLost', (e) => {
+        console.log('Marcador perdido:', e);
+      });
+    })();
+  </script>
+
+  <!--
+    How to run locally for the demo (recommended):
+    1) Serve the project folder with a simple HTTP server (many options). Example using Python 3:
+       python3 -m http.server 8000
+    2) Open http://localhost:8000/ in a mobile device or desktop with webcam permission.
+    3) Point the camera at the printed marker or the image used to create `marcador.mind`.
+
+    Evaluation checklist (for presentation):
+    - Detection of marker (visual confirmation).
+    - 3D object displayed (local `modelo.glb`).
+    - Interaction: click/tap toggles rotation.
+    - Tools used: A-Frame and MindAR.js (see the <head> script includes).
+  -->
+
 </body>
 
 </html>
